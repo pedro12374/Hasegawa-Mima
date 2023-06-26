@@ -16,13 +16,8 @@ def my_makedirs(path):
         os.makedirs(path)
 
 
-#comp = "g++ " + sys.argv[1] + " -o "+ sys.argv[1].removesuffix(".cpp")
-#print(comp)
-#os.system(comp)
-
-
-kx_range = np.arange(1, 7, 1)
-ky_range = np.arange(1, 7, 1)
+Ea_range = np.arange(1, 7, 1)
+Eb_range = np.arange(1, 7, 1)
 par=[]
 kx = [0,0,0]
 ky = [0,0,0]

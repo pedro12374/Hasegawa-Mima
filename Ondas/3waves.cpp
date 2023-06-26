@@ -15,10 +15,10 @@ using namespace boost::numeric::odeint;
 
 struct mima
 {
-    double *m_gamma,*m_omega,*m_lambda,*m_kx, *m_ky;
+    double *m_gamma,*m_omega,*m_lambda,*m_kx, *m_ky,m_Ea,m_Eb;
 	
-    mima( double omega[3],double lambda[3],double gamma[3] ,double kx[3],double ky[3])
-    : m_omega( omega ),m_lambda( lambda ),m_gamma( gamma ), m_kx(kx), m_ky(ky) { }
+    mima( double omega[3],double lambda[3],double gamma[3] ,double kx[3],double ky[3],double Ea,double Eb)
+    : m_omega( omega ),m_lambda( lambda ),m_gamma( gamma ), m_kx(kx), m_ky(ky), m_Ea(Ea), m_Eb(Eb) { }
 
     void operator()( const state_type &H , state_type &dHdt , double t ) const
     {
@@ -27,7 +27,7 @@ struct mima
 		dHdt[1] = -I*m_omega[1]*H[1]+m_lambda[1]*conj(H[0])*conj(H[2])+m_gamma[1]*H[1];
 	   	dHdt[2] = -I*m_omega[2]*H[2]+m_lambda[2]*conj(H[0])*conj(H[1])+m_gamma[2]*H[2];
 		dHdt[3] = (m_ky[0]*H[0].real()*sin(m_kx[0]*H[3]+m_ky[0]*H[4])+m_ky[0]*H[0].imag()*cos(m_kx[0]*H[3]+m_ky[0]*H[4])+ m_ky[1]*H[1].real()*sin(m_kx[1]*H[3]+m_ky[1]*H[4])+m_ky[1]*H[1].imag()*cos(m_kx[1]*H[3]+m_ky[1]*H[4]) +  m_ky[2]*H[2].real()*sin(m_kx[2]*H[3]+m_ky[2]*H[4])+m_ky[2]*H[2].imag()*cos(m_kx[2]*H[3]+m_ky[2]*H[4])      ) ;
-		dHdt[4]= -5.0*H[3]+ (-1.0)*(m_kx[0]*H[0].real()*sin(m_kx[0]*H[3]+m_ky[0]*H[4])+m_kx[0]*H[0].imag()*cos(m_kx[0]*H[3]+m_ky[0]*H[4])+ m_kx[1]*H[1].real()*sin(m_kx[1]*H[3]+m_ky[1]*H[4])+m_kx[1]*H[1].imag()*cos(m_kx[1]*H[3]+m_ky[1]*H[4]) +  m_kx[2]*H[2].real()*sin(m_kx[2]*H[3]+m_ky[2]*H[4])+m_kx[2]*H[2].imag()*cos(m_kx[2]*H[3]+m_ky[2]*H[4])      ) ;
+		dHdt[4]= -m_Ea*H[3]-m_Eb+ (-1.0)*(m_kx[0]*H[0].real()*sin(m_kx[0]*H[3]+m_ky[0]*H[4])+m_kx[0]*H[0].imag()*cos(m_kx[0]*H[3]+m_ky[0]*H[4])+ m_kx[1]*H[1].real()*sin(m_kx[1]*H[3]+m_ky[1]*H[4])+m_kx[1]*H[1].imag()*cos(m_kx[1]*H[3]+m_ky[1]*H[4]) +  m_kx[2]*H[2].real()*sin(m_kx[2]*H[3]+m_ky[2]*H[4])+m_kx[2]*H[2].imag()*cos(m_kx[2]*H[3]+m_ky[2]*H[4])      ) ;
 			
     }
 };
@@ -46,10 +46,10 @@ struct observer
 				if(fmod(t,1)==0){
 	
         m_file << t<<","; 
-		for (int i =0; i<N; i++) {
-		m_file <<x[i].real()<<","<<x[i].imag()<<",";
+		for (int i =3; i<N; i++) {
+		m_file <<x[i].real()<<",";
 		m_odefun(x, m_dxdt, t);
-		m_file<<m_dxdt[i].real()<<","<<m_dxdt[i].imag()<<",";
+		m_file<<m_dxdt[i].real()<<",";
 		}
 		m_file <<endl;
 		} 
@@ -69,7 +69,7 @@ int main(int argc,char* argv[]) {
 	x_f = M_PI;
 	y_i = 0;
 	y_f = 2*M_PI;
-	double gamma[3]={-0.211,0.01,-0.211};
+	double gamma[3]={-0.1,0.01,-0.1};
 	double lambda[3]={1,2,3};
 	double omega[3] = {0,0,0};	
 	
@@ -94,21 +94,14 @@ int main(int argc,char* argv[]) {
 	lambda[0]=0.04;//(omega[0]/(2*0.17))*((kx[2]*kx[2]+ky[2]*ky[2]-kx[1]*kx[1]+ky[1]*ky[1])*(kx[1]*ky[2]-kx[2]*ky[1])/(ky[0]-kx[0]));
 	lambda[1]=-0.5;//(omega[1]/(2*0.17))*((kx[0]*kx[0]+ky[0]*ky[0]-kx[2]*kx[2]+ky[2]*ky[2])*(kx[2]*ky[0]-kx[0]*ky[2])/(ky[1]-kx[1]));
 	lambda[2]=0.4;//(omega[2]/(2*0.17))*((kx[1]*kx[1]+ky[1]*ky[1]-kx[0]*kx[0]+ky[0]*ky[0])*(kx[0]*ky[1]-kx[1]*ky[0])/(ky[2]-kx[2]));
-	
+	double Ea = atof(argv[1]);
+	double Eb = atof(argv[2]);
 	double x_p = M_PI/2;
 	double y_p = M_PI+0.2;
 	adams_bashforth_moulton< 8 , state_type > stepper;    
-	string filename="kx_";
-	for (double ks : kx) {
-		filename+=doubleToString(ks, 1)+"_";
-	}
-	filename+="ky_";
-	for (double ks : ky) {
-		filename+=doubleToString(ks, 1)+"_";
-	}
-	filename+=".csv";
+	string filename="dat/Ea_"+ doubleToString(Ea, 1)+"-Eb_"+doubleToString(Eb, 1)+".csv";
 	ofstream myfile(filename);
-	myfile<<"time"<<","<<"phi1_r"<<","<<"phi1_i"<<","<<"dphi1_r"<<","<<"dphi1_i"<<","<<"phi2_r"<<","<<"phi2_i"<<","<<"dphi2_r"<<","<<"dphi2_i"<<","<<"phi3_r"<<","<<"phi3_i"<<","<<"dphi3_r"<<","<<"dphi3_i"<<","<<"x_r"<<","<<"x_i"<<","<<"dx_r"<<","<<"dx_i"<<","<<"y_r"<<","<<"y_i"<<","<<"dy_r"<<","<<"dy_i"<<","<<endl;
+	myfile<<"time"<<","<<"x_r"<<","<<"dx_r"<<","<<"y_r"<<","<<"dy_r"<<","<<endl;
 
 	for (x_p=x_i; x_p<=x_f; x_p+=x_step) {
 		for (y_p=y_i; y_p<=y_f; y_p+=y_step) {
@@ -118,9 +111,9 @@ int main(int argc,char* argv[]) {
 			x[2] = complex<double>(0.1,0.0);
 			x[3] = complex<double>(x_p,0.0);
 			x[4] = complex<double>(y_p,0.0);
-			mima system(omega,lambda,gamma,kx,ky);
+			mima system(omega,lambda,gamma,kx,ky,Ea,Eb);
 			observer< mima> obs(system,myfile);
-			integrate_adaptive( stepper , system , x , 0.0 ,1000.0 , 1e-3, boost::ref(obs));
+			integrate_adaptive( stepper , system , x , 0.0 ,15000.0 , 1e-3, boost::ref(obs));
 		}
 	}
    	myfile.close();

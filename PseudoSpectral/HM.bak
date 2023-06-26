@@ -1,0 +1,164 @@
+using PyPlot, Random, FFTW
+#using CSV, DataFrames
+function main()
+	nx, ny = 128, 128 # number of grid points
+	Lx, Ly = 20.0*pi, 20.0*pi      # size of the domain in each direction
+
+	# constructing the physical grid (x,y)
+	dx, dy = Lx/nx, Ly/ny
+	 x = 0:dx:Lx-dx
+	 y = 0:dy:Ly-dy
+
+	X  = zeros(nx,ny)
+	Y  = zeros(nx,ny)
+	for j in 1:ny, i in 1:nx
+	     X[i, j] = x[i]
+	     Y[i, j] = y[j]
+	end
+
+	# constructing the wavenumber grid (k,l)
+	k  = 2.0*pi/Lx * [0:nx/2; -nx/2+1:-1];
+	l  = 2.0*pi/Ly * [0:ny/2; -ny/2+1:-1];
+
+	K = zeros(nx, ny)
+	L = zeros(nx, ny)
+	for j in 1:ny, i in 1:nx
+	    K[i, j] = k[i]
+	    L[i, j] = l[j]
+	end
+
+	ksq = @. K^2 + L^2
+	bihar =K^4 .+ L^4 .+ K^2 .* L^2 .+ K^2 .* L^2
+	  
+	invksq = 1 ./(1 .+ ksq)    # this is used to obtain streamfunction ψ from vorticity ζ
+	replace!(invksq,Inf=>1);
+
+	      
+	dt = 0.025         # the time step
+	tfin = 100        # the final time for the integration
+	nstep  = 10#Int(tfin/dt) + 1;  # the total number of time steps
+	kappa = 3e-04
+	t = 0:dt:tfin;     # the array with the discreeste link nas configuraçõtized values for time
+
+	Random.seed!(1234)
+#=
+	kl = 2.0
+	ku = 2.5
+	phi0h = 0.5 .*exp(-im*rand(nx, ny)) #calcula as condições iniciais
+	phih = phi0h #faz o fourier das condições iniciais
+	#psih[1, 1] = 0
+	phih[@. ksq > (ku)^2 ] .= 0
+	phih[@. ksq < (kl)^2 ] .= 0
+
+	#psih = invksq.*psih
+	phi = real(ifft(phih))
+	psih = phih.*(1 .+ksq)
+		phix =  real(ifft(+im*K.*phih))         # calculate u velocity
+    	phiy = real(ifft(+im*L.*phih))         # calculate v velocity
+    	psix =  real(ifft(im*K.*psih))    # calculate ∂psi/∂x
+    	psiy =  real(ifft(im*L.*psih))    # calculate ∂psi/∂y
+	println(phix[50,50],phiy[50,50],psix[50,50],psiy[50,50])
+	time = 0
+	nc = Int(nx/32) # this variable allows us to plot arrows every nc points instead
+		        # of plotting an arrow at each point --- helps for better visualization
+
+
+
+
+
+	=#
+
+
+	Random.seed!(1234)
+	psi0 = randn(nx, ny)
+	psih = fft(psi0)
+	psih[1, 1] = 0
+	psih[@. ksq > (10)^2 ] .= 0
+	psih[@. ksq < (3)^2 ] .= 0
+	psi0 = real(ifft(psih))
+	phih = invksq.*psih           # calculate \hat{ψ}
+	psi =  real(ifft(psih))       # calculate ζ(x,y,t)
+	phix =  real(ifft(+im*K.*phih))         # calculate u velocity
+    phiy = real(ifft(-im*L.*phih))         # calculate v velocity
+    psix =  real(ifft(im*K.*psih))    # calculate ∂psi/∂x
+    psiy =  real(ifft(im*L.*psih))    # calculate ∂psi/∂y
+	println(phix[50,50],phiy[50,50],psix[50,50],psiy[50,50])
+	
+	time = 0
+	nc = Int(nx/32) 
+	figure(1)
+	pcolormesh(X, Y, real(ifft(phih)))
+	colorbar()
+	quiver(X[1:nc:end,1:nc:end], Y[1:nc:end,1:nc:end], phix[1:nc:end,1:nc:end], phiy[1:nc:end,1:nc:end])
+	xlabel(L"x")
+	ylabel(L"y")
+	title(string("vorticity & (u,v) at t=", time))
+	axis("square")
+	#draw();
+	savefig("HMI.png")
+
+
+	fig = figure()
+	nu = 0.0e-05# kinematic viscosity coefficient (you can also use nu=8.0e-05 for n=128)
+	vu = 0.0
+	#phibk = phi
+	for j = 2:nstep 
+	    #phih = invksq.*psih               # calculate \hat{phi}
+	    #psih = phih.*(1 .+ksq)
+	    phix =  real(ifft(im*K.*phih))         # calculate u velocity
+	    phiy = real(ifft(-im*L.*phih))         # calculate v velocity
+	    psix =  real(ifft(im*K.*psih))    # calculate ∂psi/∂x
+	    psiy =  real(ifft(im*L.*psih))    # calculate ∂psi/∂y
+		println(phix[50,50],psiy[50,50],phiy[50,50],psix[50,50])
+	    println(phix[50,50]*psiy[50,50] - phiy[50,50]*psix[50,50])
+		println(-fft(phix.*psiy + phiy.*psix)[50,50])
+		# now we are ready to calculate the r.h.s. of our PDE
+	    rhs = -fft(phix.*psiy + phiy.*psix) -vu.*fft(phiy) -nu.*bihar.*phih
+		println(rhs[50,50])
+	    
+	    psih = psih + dt*rhs         # time-step forward using the simplest Euler scheme
+	   
+	    phih = invksq.*psih
+	    phi = real(ifft(phih))
+	    if any(isnan, phi)
+		   println("Entrou")
+		    println(j)
+		    #println(phibk)
+		    break
+		end
+	    
+	    if j % 200 == 1
+	    
+		time = t[j]
+		#phih = -invksq.*psih
+		#CSV.write("dados_.csv",DataFrame(psi,:auto),header=false)
+		pcolormesh(X, Y, phi)
+		#contour(X, Y, phi)
+		title(string(L"vorticity at t=", time))
+		colorbar()
+		#quiver(X[1:nc:end,1:nc:end], Y[1:nc:end,1:nc:end], u[1:nc:end,1:nc:end], v[1:nc:end,1:nc:end])
+		#xlabel(L"x")
+		#ylabel(L"y")
+		title(string(L"vorticity e (v,u) at t=", time))
+		axis("square")
+		#sleep(0.001)
+		#IJulia.clear_output(true)
+		display(fig)
+		clf()
+	end
+	end
+	#pcolormesh(X, Y, phi)
+	#phih = fft(phi)
+	#u = real(ifft(+im*L.*phih))         # calculate u velocity
+	#v = real(ifft(+im*K.*phih))         # calculate v velocity
+		#contour(X, Y, phi)
+		#title(string(L"vorticity at t=", time))
+	#	colorbar()
+#		quiver(X[1:nc:end,1:nc:end], Y[1:nc:end,1:nc:end], u[1:nc:end,1:nc:end], v[1:nc:end,1:nc:end])
+#		xlabel(L"x")
+#		ylabel(L"y")
+#		title(string("Potencial e E at t=", time))
+#		axis("square")
+#	savefig("HMF.png")
+end
+main()
